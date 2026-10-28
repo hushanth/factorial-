@@ -1,0 +1,19 @@
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: factorial-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: factorial-app
+  template:
+    metadata:
+      labels:
+        app: factorial-app
+    spec:
+      containers:
+        - name: factorial-app
+          image: hushanth/factorial-app:latest
+          imagePullPolicy: IfNotPresent

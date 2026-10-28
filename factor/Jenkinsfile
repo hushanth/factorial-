@@ -1,0 +1,64 @@
+
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_IMAGE = "hushanth/factorial-app:${BUILD_NUMBER}"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Test Python') {
+            steps {
+                bat 'python -c "from factorial import factorial; assert factorial(10) == 3628800; print(\'Test passed\')"'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                bat 'docker build -t %DOCKER_IMAGE% .'
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-cred',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )
+                ]) {
+                    bat '''
+                        @echo off
+                        echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
+                        if errorlevel 1 exit /b 1
+                        docker push %DOCKER_IMAGE%
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                bat 'kubectl apply -f deployment.yaml'
+                bat 'kubectl set image deployment/factorial-app factorial-app=%DOCKER_IMAGE%'
+                bat 'kubectl rollout status deployment/factorial-app --timeout=180s'
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Factorial CI/CD pipeline completed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed. Check Console Output.'
+        }
+    }
+}
